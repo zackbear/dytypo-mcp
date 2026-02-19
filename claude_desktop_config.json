@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dytopo": {
+      "command": "python",
+      "args": ["/absolute/path/to/dytopo-mcp/server.py"],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here"
+      }
+    }
+  }
+}

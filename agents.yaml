@@ -1,0 +1,81 @@
+# DyTopo Agent Registry
+# Define your agents/tools/skills here
+# They'll be auto-registered when the server starts
+
+agents:
+  # Claude Code Tools
+  - id: web_search
+    description: "Searches current web content, news, and online information. Best for recent events, current prices, live data."
+    metadata:
+      category: research
+      cost: low
+
+  - id: web_fetch
+    description: "Fetches complete webpage content from URLs. Useful for reading articles, documentation, detailed content."
+    metadata:
+      category: research
+      cost: low
+
+  - id: bash_tool
+    description: "Executes bash commands in Linux container. File operations, system commands, package installation."
+    metadata:
+      category: system
+      cost: low
+
+  - id: code_executor
+    description: "Runs Python code and returns output. Calculations, data processing, testing, algorithm execution."
+    metadata:
+      category: coding
+      cost: low
+
+  - id: file_reader
+    description: "Reads file contents from disk. Supports text files, JSON, CSV, code files, configuration files."
+    metadata:
+      category: files
+      cost: low
+
+  - id: file_writer
+    description: "Creates new files with content. Writes text, code, data files, configuration files."
+    metadata:
+      category: files
+      cost: low
+
+  - id: str_replace
+    description: "Edits existing files by replacing unique strings. Precise code modifications, config updates."
+    metadata:
+      category: files
+      cost: low
+
+  # Specialized Skills (examples - customize these)
+  - id: python_expert
+    description: "Expert in Python development. FastAPI, async, type hints, SQLAlchemy, pytest, best practices."
+    metadata:
+      category: coding
+      language: python
+
+  - id: react_expert
+    description: "Expert in React development. Components, hooks, state management, TypeScript, Tailwind CSS, responsive design."
+    metadata:
+      category: coding
+      language: javascript
+
+  - id: sql_expert
+    description: "Expert in SQL and database design. PostgreSQL, MySQL, queries, indexes, migrations, optimization."
+    metadata:
+      category: database
+
+  - id: security_auditor
+    description: "Security expert. Identifies OWASP vulnerabilities, SQL injection, XSS, authentication issues, crypto misuse."
+    metadata:
+      category: security
+
+  - id: performance_optimizer
+    description: "Performance expert. Algorithmic complexity, database optimization, memory usage, caching strategies."
+    metadata:
+      category: optimization
+
+  # Add your custom agents below
+  # - id: your_agent_name
+  #   description: "What this agent does and its expertise"
+  #   metadata:
+  #     key: value
