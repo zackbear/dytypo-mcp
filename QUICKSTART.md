@@ -50,10 +50,19 @@ cp .env.example.txt .env
 
 ## 3. Populate agents.yaml from Your Installed Skills
 
-Instead of editing the 12-agent default, generate a registry from your real environment:
+`agents.yaml` is gitignored — it's your personal registry. The repo ships `agents.example.yaml`
+as a starting point; the server loads it automatically if `agents.yaml` is absent.
+
+Generate your own from your real environment:
 
 ```bash
 python bootstrap_agents.py
+```
+
+Or copy the example and edit manually:
+
+```bash
+cp agents.example.yaml agents.yaml
 ```
 
 This scans:

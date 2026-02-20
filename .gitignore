@@ -2,6 +2,7 @@
 .env
 
 # DyTopo — generated / machine-specific files
+agents.yaml
 .dytopo_cache.json
 .dytopo_cache.tmp
 

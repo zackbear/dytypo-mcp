@@ -1,0 +1,91 @@
+# DyTopo Agent Registry — Example
+#
+# Copy this file to agents.yaml and customize, or generate from your
+# environment automatically:
+#
+#   python bootstrap_agents.py
+#
+# agents.yaml is gitignored — this example file is what ships with the repo.
+# See README.md → Agent Configuration and SKILL.md for description quality tips.
+
+agents:
+  # ── Built-in Claude Code tools ──────────────────────────────────────────────
+  - id: web_search
+    description: "Searches current web content, news, and online information. Best for recent events, current prices, live data."
+    metadata:
+      category: tools
+
+  - id: web_fetch
+    description: "Fetches complete webpage content from URLs. Useful for reading articles, documentation, and detailed content."
+    metadata:
+      category: tools
+
+  - id: bash
+    description: "Executes bash/shell commands. File operations, system commands, running scripts, package installation."
+    metadata:
+      category: tools
+
+  - id: read
+    description: "Reads file contents from disk. Supports text files, JSON, CSV, code files, and configuration files."
+    metadata:
+      category: tools
+
+  - id: write
+    description: "Creates and writes new files with content. Saves text, code, data, and configuration files to disk."
+    metadata:
+      category: tools
+
+  - id: edit
+    description: "Edits existing files by replacing specific strings. Precise code modifications and config updates."
+    metadata:
+      category: tools
+
+  - id: glob
+    description: "Finds files matching patterns. File discovery, listing files by extension, searching directory trees."
+    metadata:
+      category: tools
+
+  - id: grep
+    description: "Searches file contents using regular expressions. Find code patterns, text matches, and references."
+    metadata:
+      category: tools
+
+  - id: task
+    description: "Spawns a subagent to handle a complex subtask autonomously. Delegates work to a specialized agent."
+    metadata:
+      category: tools
+
+  # ── Example specialized agents ───────────────────────────────────────────────
+  # Replace or extend these with your actual skills and subagent types.
+  # Description quality matters — use keywords that match how tasks are phrased.
+
+  - id: python_expert
+    description: "Expert in Python development. FastAPI, async/await, type hints, SQLAlchemy, pytest, and best practices."
+    metadata:
+      category: coding
+
+  - id: react_expert
+    description: "Expert in React development. Components, hooks, state management, TypeScript, Tailwind CSS, responsive design."
+    metadata:
+      category: coding
+
+  - id: sql_expert
+    description: "Expert in SQL and database design. PostgreSQL, MySQL, queries, indexes, schema migrations, query optimization."
+    metadata:
+      category: database
+
+  - id: security_auditor
+    description: "Security expert. Identifies OWASP vulnerabilities, SQL injection, XSS, authentication issues, and crypto misuse."
+    metadata:
+      category: security
+
+  - id: performance_optimizer
+    description: "Performance expert. Algorithmic complexity, database query optimization, memory usage, and caching strategies."
+    metadata:
+      category: optimization
+
+  # ── Add your own agents below ────────────────────────────────────────────────
+  # - id: your_agent_id
+  #   description: "What this agent does — be specific, use task-phrasing keywords"
+  #   metadata:
+  #     category: your_category

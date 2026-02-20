@@ -168,6 +168,18 @@ The hook **never blocks** — if it errors, the Task proceeds unmodified.
 
 ## Agent Configuration
 
+`agents.yaml` is gitignored — it's your personal registry, generated from your environment. The repo ships with `agents.example.yaml` as a starting point. The server falls back to the example file automatically if `agents.yaml` is not present.
+
+**To get started:**
+
+```bash
+# Option A: generate from your installed skills (recommended)
+python bootstrap_agents.py
+
+# Option B: start from the example and edit manually
+cp agents.example.yaml agents.yaml
+```
+
 Agents auto-load from `agents.yaml` on server start. Edit manually or generate with `bootstrap_agents.py`:
 
 ```yaml

@@ -66,14 +66,21 @@ class DyTopoRouter:
         self._load_agents_from_config()
 
     def _load_agents_from_config(self):
-        """Load agents from agents.yaml if it exists."""
-        config_path = Path(__file__).parent / 'agents.yaml'
+        """Load agents from agents.yaml, falling back to agents.example.yaml."""
+        repo_dir = Path(__file__).parent
+        config_path = repo_dir / 'agents.yaml'
+        fallback_path = repo_dir / 'agents.example.yaml'
 
         if not config_path.exists():
-            return
+            if fallback_path.exists():
+                config_path = fallback_path
+                print("[DyTopo] agents.yaml not found — loading agents.example.yaml. "
+                      "Run 'python bootstrap_agents.py' to generate your own agents.yaml.")
+            else:
+                return
 
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
 
             if not config or 'agents' not in config:
@@ -86,10 +93,10 @@ class DyTopoRouter:
 
                 self.register_agent(agent_id, description, metadata)
 
-            print(f"[DyTopo] Loaded {len(config['agents'])} agents from agents.yaml")
+            print(f"[DyTopo] Loaded {len(config['agents'])} agents from {config_path.name}")
 
         except Exception as e:
-            print(f"[DyTopo] Warning: Could not load agents.yaml: {e}")
+            print(f"[DyTopo] Warning: Could not load {config_path.name}: {e}")
 
 
     def embed_text(self, text: str) -> np.ndarray:
