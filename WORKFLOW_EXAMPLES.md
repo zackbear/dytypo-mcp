@@ -1,5 +1,10 @@
 # DyTopo Workflow Integration Examples
 
+> **Note**: DyTopo is an MCP server — `get_routing_plan`, `register_agent`, etc. are MCP tool calls,
+> not a Python import. The code examples below use pseudocode-style Python to illustrate the
+> routing logic. In practice, calls go through the MCP protocol (Claude Desktop, Claude Code, or
+> any MCP client). See `QUICKSTART.md` for setup.
+
 ## Example 1: Claude Code with DyTopo Routing
 
 ### Scenario
@@ -27,9 +32,7 @@ for step in steps:
 
 ### With DyTopo
 ```python
-# Dynamic routing based on task
-from dytopo import get_routing_plan
-
+# Dynamic routing based on task — calls go through MCP tool protocol
 # Register tools once
 tools = {
     "web_search": "Searches Google/Bing for URLs matching query",
@@ -248,10 +251,7 @@ for question in questions:
 ### Add DyTopo to Agent Zero's sub-agent system
 
 ```python
-# In Agent Zero config
-from dytopo import register_agent, get_routing_plan
-
-# Register Agent Zero's tools as agents
+# Register Agent Zero's tools as agents via MCP tool calls
 def register_agent_zero_tools():
     tools = {
         "code_execution": "Executes Python code in isolated environment",

@@ -163,6 +163,28 @@ echo '{"tool_name":"Task","tool_input":{"prompt":"build a login form"}}' | pytho
 
 You should see a JSON response with the prompt annotated.
 
+### "No module named yaml" (or any missing module)
+
+Your active Python environment is missing dependencies. Run:
+
+```bash
+pip install -r requirements.txt
+```
+
+If you're using a virtual environment, make sure it's activated before running any DyTopo scripts:
+
+```bash
+# Check which Python is active
+python -c "import sys; print(sys.executable)"
+
+# If wrong, activate your venv first, then install
+source venv/bin/activate      # macOS / Linux
+venv\Scripts\activate         # Windows
+pip install -r requirements.txt
+```
+
+For the hook, make sure the `command` in `settings.json` points to the **same Python** that has the dependencies installed — use the full path if needed (e.g. `/path/to/venv/bin/python`).
+
 ### Voyage AI / anthropic provider fails
 
 Make sure you have the right package:
