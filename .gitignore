@@ -1,6 +1,13 @@
 # Environment variables
 .env
 
+# DyTopo — generated / machine-specific files
+.dytopo_cache.json
+.dytopo_cache.tmp
+
+# Claude Code local settings (contain machine-specific absolute paths)
+.claude/
+
 # Python
 __pycache__/
 *.py[cod]

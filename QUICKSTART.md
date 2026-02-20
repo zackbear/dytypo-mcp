@@ -1,6 +1,8 @@
-# Quick Start Guide
+# DyTopo Quick Start
 
 Get DyTopo running in 5 minutes.
+
+---
 
 ## 1. Install
 
@@ -9,60 +11,105 @@ cd dytopo-mcp
 pip install -r requirements.txt
 ```
 
-## 2. Setup API Key
+---
 
-Pick one:
+## 2. Choose an Embedding Provider
 
-**Option A**: Environment variable
-```bash
-export OPENAI_API_KEY="sk-your-key-here"
-```
+Pick one — or use local mode (no API key needed):
 
-**Option B**: .env file
-```bash
-cp .env.example .env
-# Edit .env with your key
-```
-
-## 3. Configure Agents
-
-The `agents.yaml` file comes pre-configured with common tools.
-
-**For Claude Code users**: The defaults match Claude Code tool names. Keep as-is.
-
-**For custom workflows**: Edit descriptions to match your use case:
-
-```yaml
-agents:
-  - id: your_tool_name
-    description: "Detailed description of what it does"
-    metadata:
-      category: your_category
-```
-
-See `AGENT_CONFIG.md` for examples.
-
-## 4. Test It
+**Option A — Local (free, no key)**
 
 ```bash
-python example_usage.py
+export DYTOPO_EMBEDDER=local
+# Downloads ~80 MB model on first use
 ```
 
-You should see:
-```
-✓ Loaded 10 agents from agents.yaml
+**Option B — OpenAI**
 
-Selected agents:
-  • web_search (relevance: 0.89)
-  • file_writer (relevance: 0.82)
+```bash
+export OPENAI_API_KEY="sk-..."
+# Auto-detected; no need to set DYTOPO_EMBEDDER
 ```
 
-## 5. Use with Claude
+**Option C — Voyage AI (Anthropic partner)**
 
-Add to Claude Desktop config:
+```bash
+pip install voyageai
+export VOYAGE_API_KEY="pa-..."       # or ANTHROPIC_API_KEY as alias
+export DYTOPO_EMBEDDER=anthropic
+```
+
+Or use a `.env` file:
+
+```bash
+cp .env.example.txt .env
+# Edit .env with your preferred provider
+```
+
+---
+
+## 3. Populate agents.yaml from Your Installed Skills
+
+Instead of editing the 12-agent default, generate a registry from your real environment:
+
+```bash
+python bootstrap_agents.py
+```
+
+This scans:
+- **~/.claude/skills/** — all your installed `SKILL.md` files (~387 on a typical install)
+- **Built-in Claude Code tools** — Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, Task, etc.
+- **MCP servers** — from `claude_desktop_config.json`
+
+Result: `agents.yaml` with 300–400 real agents, ready for semantic routing.
+
+**Optional: prune duplicate skills**
+
+```bash
+python bootstrap_agents.py --prune          # remove near-duplicates (similarity ≥ 0.92)
+python bootstrap_agents.py --prune --dry-run  # preview first
+```
+
+**Optional: re-run on a schedule**
+
+```bash
+python bootstrap_agents.py --schedule weekly   # every Monday 9 AM
+python bootstrap_agents.py --schedule 08:30    # daily at 8:30 AM
+```
+
+---
+
+## 4. Configure the Claude Code Hook (Recommended)
+
+The hook automatically injects a routing plan into every Task tool dispatch — no manual invocation needed.
+
+Add to `~/.claude/settings.json` (global) or `.claude/settings.local.json` (project-local):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /absolute/path/to/dytopo-mcp/dytopo_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Now every time Claude spawns a subagent via the Task tool, DyTopo silently annotates the prompt with the top-k semantically matched agents.
+
+---
+
+## 5. Add DyTopo as an MCP Server
 
 **Mac**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
@@ -78,116 +125,58 @@ Add to Claude Desktop config:
 
 Restart Claude Desktop.
 
-## 6. Try It in Chat
+---
+
+## 6. Try It
+
+In Claude chat:
 
 ```
 Get a routing plan for "Download the latest Bitcoin price and save to JSON"
 ```
 
-Claude will use the `get_routing_plan` tool and show you which agents were selected.
+Claude will call `get_routing_plan` and show you which agents were selected and why.
 
-## What's Next?
-
-### Customize Agent Descriptions
-
-Edit `agents.yaml` to better match your tasks:
-
-```yaml
-- id: web_search
-  description: "Searches Google for cryptocurrency prices, news, and market data"
-  # More specific = better routing
-```
-
-### Test Different Tasks
-
-```python
-# Research task
-plan1 = get_routing_plan("Research recent AI papers on arXiv")
-
-# Coding task  
-plan2 = get_routing_plan("Write a FastAPI endpoint with authentication")
-
-# Data task
-plan3 = get_routing_plan("Process CSV file and calculate statistics")
-```
-
-Each task should route to different agents.
-
-### Check Similarity Scores
-
-```python
-compute_agent_similarity(
-    task_text="Build a React component",
-    agent_id_1="react_expert"
-)
-# Should be > 0.8 for good matches
-```
-
-If scores are low, improve agent descriptions.
-
-### Use the Topology
-
-```python
-plan = get_routing_plan("Your task", k=4)
-
-# Execute in order
-for round in plan["execution_order"]:
-    for agent_id in round:
-        neighbors = plan["topology"][agent_id]
-        # Only pass context from neighbors
-```
-
-See `WORKFLOW_EXAMPLES.md` for complete integration patterns.
+---
 
 ## Common Issues
 
 ### "No agents registered"
 
-The `agents.yaml` file might be missing or has errors.
+`agents.yaml` is missing or has a syntax error. Run:
 
-Check the server output:
+```bash
+python bootstrap_agents.py
 ```
-✓ Loaded N agents from agents.yaml
-```
-
-If you don't see this, check:
-1. `agents.yaml` exists in the same directory as `server.py`
-2. YAML syntax is valid
-3. File has `agents:` section
 
 ### Low similarity scores
 
-Agent descriptions are too generic.
+Agent descriptions are too generic. Run bootstrap with pruning to consolidate, or manually refine descriptions in `agents.yaml`. See **Pitfall 2** in `SKILL.md`.
 
-**Fix**: Add more detail:
-```yaml
-# Bad
-description: "Does coding stuff"
+### Hook not firing
 
-# Good  
-description: "Writes Python backend code using FastAPI, SQLAlchemy, async patterns, type hints, and pytest for testing"
+Check the path in `settings.json` is absolute. Test manually:
+
+```bash
+echo '{"tool_name":"Task","tool_input":{"prompt":"build a login form"}}' | python dytopo_hook.py
 ```
 
-### Wrong agents selected
+You should see a JSON response with the prompt annotated.
 
-Task phrasing might be ambiguous.
+### Voyage AI / anthropic provider fails
 
-**Fix**: Be more specific:
+Make sure you have the right package:
+
+```bash
+pip install voyageai
 ```
-# Vague
-"Help me with my website"
 
-# Specific
-"Debug why my React component won't re-render when props change"
-```
+And the right key: `VOYAGE_API_KEY` (or `ANTHROPIC_API_KEY` as alias). The `anthropic` Python package is **not** used for embeddings.
+
+---
 
 ## Next Steps
 
-1. ✅ Install and test
-2. ✅ Customize agents.yaml
-3. ✅ Integrate with your workflow
-4. Read `SKILL.md` for implementation patterns
-5. Read `WORKFLOW_EXAMPLES.md` for real examples
-6. Check `AGENT_CONFIG.md` for advanced config
-
-You're ready to build semantic routing into your agentic workflows.
+1. `README.md` — full feature reference and changelog
+2. `SKILL.md` — implementation patterns, bootstrap guide, pitfalls
+3. `LLM_DISCOVERY.md` — auto-generate agent definitions with an LLM

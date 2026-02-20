@@ -35,7 +35,7 @@ agents:
       cost: low
 
   - id: file_writer
-    description: "Creates new files with content. Writes text, code, data files, configuration files."
+    description: "Saves, exports, and outputs data to files. Writes and creates text, JSON, CSV, code, and configuration files on disk."
     metadata:
       category: files
       cost: low

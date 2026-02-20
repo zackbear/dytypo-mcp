@@ -5,6 +5,7 @@ Use Claude/GPT to automatically discover, create, and improve agent definitions.
 ## Why Use LLM Discovery?
 
 Writing good agent descriptions is hard:
+
 - Need to be specific enough for semantic matching
 - Should include relevant keywords
 - Must differentiate from similar agents
@@ -27,6 +28,7 @@ suggest_agents_for_domain(
 ```
 
 **Returns**:
+
 ```json
 {
   "suggested_agents": [
@@ -46,6 +48,7 @@ suggest_agents_for_domain(
 ```
 
 **Then**: Review and register the ones you want:
+
 ```python
 register_agent("html_parser", "Extracts structured data from HTML...")
 ```
@@ -69,6 +72,7 @@ improve_agent_description(
 ```
 
 **Returns**:
+
 ```json
 {
   "original_description": "Searches the web",
@@ -92,6 +96,7 @@ analyze_agent_coverage(
 ```
 
 **Returns**:
+
 ```json
 {
   "coverage_score": 65,
@@ -133,6 +138,7 @@ discover_agents_from_tools(
 ```
 
 **Returns**:
+
 ```json
 {
   "discovered_agents": [
@@ -172,6 +178,7 @@ suggest_missing_agents(
 ```
 
 **Returns**:
+
 ```json
 {
   "missing_agents": [
@@ -441,6 +448,7 @@ for task in test_tasks:
 LLM discovery uses GPT-4 API calls:
 
 **Approximate costs**:
+
 - `suggest_agents_for_domain`: ~$0.02 per call
 - `improve_agent_description`: ~$0.01 per call
 - `analyze_agent_coverage`: ~$0.02 per call

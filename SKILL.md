@@ -4,7 +4,7 @@
 
 **Based on**: DyTopo: Dynamic Topology Routing for Multi-Agent Reasoning via Semantic Matching (arXiv:2602.06039)
 
-**When to use this skill**: Any multi-agent workflow, tool selection, skill routing, or task decomposition scenario where you want semantic matching instead of fixed topologies.
+**When to use this skill**: Any multi-agent workflow, tool selection, skill routing, or task decomposition scenario where you want semantic matching instead of fixed topologies. Also activates automatically via the PreToolUse hook whenever the Task tool is dispatched.
 
 ---
 
@@ -21,6 +21,100 @@ Task → Embed task → Select relevant agents → Build semantic graph → Rout
 ```
 
 Key difference: **Topology adapts to task semantics**
+
+---
+
+## PreToolUse Hook (Automatic Routing)
+
+DyTopo installs a Claude Code hook that fires **before every Task tool call**.
+The hook appends a routing plan to the Task prompt, guiding subagent selection.
+
+### How It Works
+
+```
+Claude dispatches Task tool
+        ↓
+dytopo_hook.py reads prompt from stdin
+        ↓
+Embeds prompt → scores all agents in agents.yaml
+        ↓
+Appends routing plan to prompt (top-k agents, scores, recommended subagent_type)
+        ↓
+Claude sees the annotation and uses it to pick the right subagent_type
+```
+
+### Hook Configuration
+
+In `.claude/settings.json` (or `settings.local.json`):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /path/to/dytopo-mcp/dytopo_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Hook Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DYTOPO_HOOK_K` | `3` | Number of agents to select |
+| `DYTOPO_HOOK_GRAPH` | `knn` | Graph type (knn, star, threshold) |
+| `DYTOPO_AGENTS_YAML` | `./agents.yaml` | Path to agent registry |
+| `DYTOPO_EMBEDDER` | auto | Embedding provider |
+
+---
+
+## Embedding Providers
+
+DyTopo supports three embedding backends. Set via `DYTOPO_EMBEDDER` env var or auto-detected.
+
+### Auto-Detection Order
+
+```
+OPENAI_API_KEY set?    → openai
+ANTHROPIC_API_KEY set? → anthropic
+Otherwise              → local (sentence-transformers, no key needed)
+```
+
+### Provider Comparison
+
+| Provider | Key Required | Quality | Cost | Latency |
+|---|---|---|---|---|
+| `openai` | Yes (OPENAI_API_KEY) | High | ~$0.00002/1K tokens | Low |
+| `anthropic` | Yes (ANTHROPIC_API_KEY) | High | Per Voyage pricing | Low |
+| `local` | None | Good | Free | First load only |
+
+### Setting the Provider
+
+```bash
+# Option A: env var
+export DYTOPO_EMBEDDER=local
+
+# Option B: .env file
+DYTOPO_EMBEDDER=local
+DYTOPO_LOCAL_MODEL=all-MiniLM-L6-v2   # optional override
+```
+
+### Embedding Cache
+
+All providers are wrapped by `CachedEmbedder` which persists embeddings to
+`.dytopo_cache.json`. Each unique text is embedded **once** — subsequent calls
+use the cached vector instantly, regardless of provider.
+
+Cache is keyed by `provider_name:sha256(text)[:16]`, so switching providers
+does not pollute existing cache entries.
 
 ---
 
@@ -43,18 +137,13 @@ register_agent(
 )
 
 register_agent(
-    "file_reader", 
-    "Reads file contents from disk. Handles text files, JSON, CSV, code files."
+    "file_writer",
+    "Saves, exports, and outputs data to files. Writes and creates text, JSON, CSV, code, and configuration files on disk."
 )
 
 register_agent(
     "code_executor",
     "Executes Python code and returns output. Useful for calculations, data processing, testing."
-)
-
-register_agent(
-    "database_query",
-    "Queries SQL databases. Retrieves data from PostgreSQL, MySQL, SQLite."
 )
 
 # Route task to relevant tools
@@ -75,7 +164,7 @@ for round in plan["execution_order"]:
         # Get context from neighbors
         neighbor_ids = plan["topology"][agent_id]
         neighbor_outputs = [outputs[n] for n in neighbor_ids if n in outputs]
-        
+
         # Execute with neighbor context
         result = execute_tool(agent_id, task, neighbor_outputs)
         outputs[agent_id] = result
@@ -97,7 +186,7 @@ register_agent(
 )
 
 register_agent(
-    "api_specialist", 
+    "api_specialist",
     "REST APIs, FastAPI, Express, request validation, error handling, authentication"
 )
 
@@ -127,7 +216,7 @@ api_output = generate_code("api_specialist", task)
 
 # Round 2: Database specialist adds user model
 db_output = generate_code(
-    "database_specialist", 
+    "database_specialist",
     task,
     context=[api_output]  # Only from graph neighbors
 )
@@ -135,7 +224,7 @@ db_output = generate_code(
 # Round 3: Testing specialist adds tests
 test_output = generate_code(
     "testing_specialist",
-    task, 
+    task,
     context=[api_output, db_output]
 )
 ```
@@ -269,26 +358,26 @@ messages = {agent_id: task for agent_id in plan["selected_agents"]}
 
 for round_num in range(3):  # 3 rounds of dialogue
     new_messages = {}
-    
+
     for agent_id in plan["selected_agents"]:
         # Get messages from neighbors only
         neighbor_msgs = [
             messages[n] for n in plan["topology"][agent_id]
         ]
-        
+
         # Generate response
         prompt = f"""
         Task: {task}
-        
+
         Messages from collaborators:
         {format_messages(neighbor_msgs)}
-        
+
         Your response as {agent_id}:
         """
-        
+
         response = llm(prompt)
         new_messages[agent_id] = response
-    
+
     messages = new_messages
 ```
 
@@ -342,7 +431,7 @@ register_agent(
 # Custom routing with confidence weights
 def weighted_routing_plan(task, k=4):
     base_plan = get_routing_plan(task, k)
-    
+
     # Reweight edges by agent performance
     weighted_topology = {}
     for agent_id, neighbors in base_plan["topology"].items():
@@ -350,10 +439,10 @@ def weighted_routing_plan(task, k=4):
             get_agent_metadata(agent_id)["accuracy_history"]
         )
         weighted_topology[agent_id] = {
-            neighbor: agent_confidence 
+            neighbor: agent_confidence
             for neighbor in neighbors
         }
-    
+
     return weighted_topology
 
 # Use weights to prioritize high-confidence paths
@@ -444,6 +533,8 @@ register_agent(
 
 **Why**: Embeddings capture semantic detail. Specific descriptions = better routing.
 
+**Tip**: Use keywords that match how tasks are naturally phrased — e.g. "save", "export", "output" for a file writer agent, not just "creates files".
+
 ---
 
 ### Optimal K Values
@@ -453,7 +544,7 @@ register_agent(
 - **k=6-8**: Broader coverage, higher token cost
 - **k>10**: Usually wasteful, defeats sparsity purpose
 
-**Rule**: Start with k=4, adjust based on task complexity.
+**Rule**: Start with k=4, adjust based on task complexity. Hook uses k=3 by default.
 
 ---
 
@@ -511,21 +602,23 @@ print(f"Similarity: {result['similarity']}")
 
 ---
 
-## Advanced: Custom Embedding Models
+## Advanced: Switching Embedding Providers
 
-If you don't want OpenAI embeddings:
+```bash
+# Switch to local (no API key, free, ~80MB download once)
+export DYTOPO_EMBEDDER=local
 
-```python
-# Use local model
-from sentence_transformers import SentenceTransformer
+# Switch to Anthropic/Voyage
+export DYTOPO_EMBEDDER=anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-def custom_embed(text):
-    return model.encode(text)
-
-# Modify MCP server to use custom embedder
+# Keep OpenAI (original default)
+export DYTOPO_EMBEDDER=openai
+export OPENAI_API_KEY=sk-...
 ```
+
+The cache handles provider switching gracefully — each provider has its own
+namespace in `.dytopo_cache.json`, so cached vectors are never mixed.
 
 ---
 
@@ -537,11 +630,21 @@ def custom_embed(text):
 # Bad
 register_agent("helper", "Helps with tasks")
 
-# Good  
+# Good
 register_agent("sql_optimizer", "Optimizes SQL queries by adding indexes, rewriting joins, using CTEs, analyzing execution plans")
 ```
 
-### Pitfall 2: Over-Routing
+### Pitfall 2: Missing Keywords in Descriptions
+
+```python
+# Bad — won't surface for "save to JSON" tasks
+register_agent("file_writer", "Creates new files with content.")
+
+# Good — "save", "export", "output" all match natural task phrasing
+register_agent("file_writer", "Saves, exports, and outputs data to files. Writes and creates text, JSON, CSV, code, and configuration files on disk.")
+```
+
+### Pitfall 3: Over-Routing
 
 Don't use DyTopo for every single operation. Use it when:
 - You have 5+ potential agents/tools
@@ -549,7 +652,7 @@ Don't use DyTopo for every single operation. Use it when:
 - Token costs matter
 - You need explainable routing
 
-### Pitfall 3: Ignoring Topology
+### Pitfall 4: Ignoring Topology
 
 ```python
 # Bad - getting plan but not using it
@@ -570,15 +673,14 @@ for agent_id in plan["selected_agents"]:
 def test_routing_quality(task, expected_agents):
     plan = get_routing_plan(task, k=len(expected_agents))
     selected = [a["id"] for a in plan["selected_agents"]]
-    
-    # Check coverage
+
     coverage = len(set(selected) & set(expected_agents))
     precision = coverage / len(selected)
     recall = coverage / len(expected_agents)
-    
+
     print(f"Precision: {precision:.2f}")
     print(f"Recall: {recall:.2f}")
-    
+
     return precision > 0.8 and recall > 0.8
 
 # Example
@@ -621,28 +723,26 @@ context = {"task": task}
 
 for round_idx, agent_round in enumerate(plan["execution_order"]):
     print(f"\n=== Round {round_idx + 1} ===")
-    
+
     for agent_id in agent_round:
-        # Get neighbor outputs
         neighbors = plan["topology"][agent_id]
         neighbor_context = [
-            context[n] for n in neighbors 
+            context[n] for n in neighbors
             if n in context and n != "task"
         ]
-        
-        # Generate with agent
+
         prompt = f"""
         Task: {task}
-        
+
         Previous work from collaborators:
         {json.dumps(neighbor_context, indent=2)}
-        
+
         As the {agent_id}, provide your contribution:
         """
-        
+
         output = llm(prompt)
         context[agent_id] = output
-        
+
         print(f"{agent_id}: {output[:100]}...")
 
 # 4. Final aggregation
@@ -650,32 +750,77 @@ all_outputs = [context[a["id"]] for a in plan["selected_agents"]]
 final_result = synthesize(all_outputs)
 ```
 
-**Output**:
+---
+
+---
+
+## Bootstrap: Populate agents.yaml from Your Environment
+
+Out of the box, `agents.yaml` contains ~12 generic agents.
+`bootstrap_agents.py` replaces it with **your actual installed skills** (300+)
+plus built-in tools and MCP servers — automatically.
+
+### Quick Start
+
+```bash
+# One-time run (on-demand)
+python bootstrap_agents.py
+
+# Run + semantic pruning (removes duplicate/redundant skills)
+python bootstrap_agents.py --prune
+
+# Preview what pruning would do without writing
+python bootstrap_agents.py --prune --dry-run
+
+# Tighten or loosen the duplicate threshold (default 0.92)
+python bootstrap_agents.py --prune --threshold 0.90
 ```
-Selected 5 agents
-Topology: {
-  'requirements_analyzer': ['architecture_designer'],
-  'architecture_designer': ['code_generator', 'requirements_analyzer'],
-  'code_generator': ['test_writer', 'architecture_designer'],
-  'test_writer': ['security_auditor', 'code_generator'],
-  'security_auditor': ['test_writer']
-}
 
-=== Round 1 ===
-requirements_analyzer: Created spec with endpoints: POST /register, GET /verify-email...
+### Sources Scanned
 
-=== Round 2 ===
-architecture_designer: Using FastAPI with Pydantic models, Redis for temp storage...
+| Source | Default Location | Env Override |
+|---|---|---|
+| Built-in Claude Code tools | (hardcoded) | `--no-builtins` |
+| Installed skills | `~/.claude/skills/` | `DYTOPO_SKILLS_DIR` |
+| MCP servers | `claude_desktop_config.json` | `DYTOPO_MCP_CONFIG` |
 
-=== Round 3 ===
-code_generator: [Full implementation]
+### Scheduled Execution
 
-=== Round 4 ===
-test_writer: [Test suite]
+```bash
+# Run every Monday at 9 AM (requires: pip install schedule)
+python bootstrap_agents.py --schedule weekly
 
-=== Round 5 ===  
-security_auditor: Added rate limiting, input validation, secure token generation...
+# Daily at a specific time
+python bootstrap_agents.py --schedule 08:30
+
+# Every Friday afternoon
+python bootstrap_agents.py --schedule fri@17:00
 ```
+
+Supported schedule expressions:
+- `daily`  — every day at 09:00
+- `weekly` — every Monday at 09:00
+- `HH:MM`  — daily at that time (e.g. `08:30`)
+- `DAY@HH:MM` — weekly (e.g. `mon@08:30`, `fri@17:00`)
+
+For system-level scheduling, use `cron` (Linux/macOS) or Task Scheduler (Windows):
+```
+# crontab: every Monday at 9 AM
+0 9 * * 1 python /path/to/dytypo-mcp/bootstrap_agents.py
+```
+
+### Semantic Pruner
+
+With 300+ skills, many are semantically redundant. The pruner uses cosine
+similarity to cluster descriptions and removes duplicates automatically.
+
+```
+Before prune:  398 agents
+After prune:   ~260 agents  (varies by threshold)
+```
+
+Agents removed are those where similarity ≥ threshold with a richer peer.
+The richer description (longer) is always kept.
 
 ---
 
@@ -683,12 +828,14 @@ security_auditor: Added rate limiting, input validation, secure token generation
 
 DyTopo transforms multi-agent systems from:
 - Fixed topologies → Task-conditioned graphs
-- Broadcast communication → Semantic routing  
+- Broadcast communication → Semantic routing
 - Manual coordination → Automatic selection
 - High token cost → Sparse efficiency
 
+The **PreToolUse hook** means this happens automatically on every Task dispatch — no manual invocation needed.
+
+The **pluggable embedder + cache** means you can use OpenAI, Anthropic, or a fully local model, and each agent description is only ever embedded once.
+
+The **bootstrap script** keeps your `agents.yaml` in sync with your real installed skills — run it on-demand or on a schedule whenever you install new skills.
+
 Use it whenever you have multiple agents/tools/skills and want intelligent routing based on task semantics.
-
-The MCP server handles the heavy lifting. You just register agents and get routing plans.
-
-**Next**: Try registering your actual tools or skills and see which ones get selected for different tasks. The semantic matching often surfaces non-obvious but useful agent combinations.
