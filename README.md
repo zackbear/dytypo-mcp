@@ -36,7 +36,7 @@ pip install -r requirements.txt
 DyTopo supports three embedding backends. Set `DYTOPO_EMBEDDER` or let it auto-detect:
 
 | Provider | Key Required | Package | Notes |
-|---|---|---|---|
+| -------- | ------------ | --------|
 | `openai` | `OPENAI_API_KEY` | `openai` | Default if key present. `text-embedding-3-small`. |
 | `anthropic` | `VOYAGE_API_KEY` (or `ANTHROPIC_API_KEY`) | `voyageai` | Voyage AI `voyage-3-lite`. |
 | `local` | None | `sentence-transformers` | Free, ~80 MB model download on first use. |
@@ -65,7 +65,7 @@ All providers cache embeddings to `.dytopo_cache.json`. Each text is embedded **
 
 ## Bootstrap: Populate agents.yaml from Your Environment
 
-Out of the box, `agents.yaml` has ~12 generic agents. `bootstrap_agents.py` replaces it with your **actual installed skills** (300+), built-in Claude Code tools, and MCP servers — automatically.
+Out of the box, `agents.yaml` has ~12 generic agents. `bootstrap_agents.py` replaces it with your **actual installed skills**, built-in Claude Code tools, and MCP servers — automatically.
 
 ### Quick Start
 
@@ -83,7 +83,7 @@ python bootstrap_agents.py --prune --dry-run --threshold 0.90
 ### Sources
 
 | Source | Default Location |
-|---|---|
+| ---- | --- |
 | Built-in Claude Code tools | hardcoded (Bash, Read, Write, Edit, Glob, Grep, WebSearch, …) |
 | Installed skills | `~/.claude/skills/` — reads each `SKILL.md` |
 | MCP servers | `claude_desktop_config.json` / `.claude.json` |
@@ -106,9 +106,9 @@ For system-level scheduling use cron (macOS/Linux) or Task Scheduler (Windows) t
 
 ### Semantic Pruner
 
-With 300+ skills, many are semantically redundant. `--prune` computes pairwise cosine similarity and removes near-duplicates, keeping the richer (longer) description.
+When many skills are installed, they are often semantically redundant. `--prune` computes pairwise cosine similarity and removes near-duplicates, keeping the richer (longer) description.
 
-```
+``` bash
 Before:  398 agents
 After:   ~260 agents  (varies by threshold, default 0.92)
 ```
@@ -144,7 +144,7 @@ Add to `.claude/settings.json` (global) or `.claude/settings.local.json` (projec
 ### Hook Environment Variables
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `DYTOPO_HOOK_K` | `3` | Agents selected per Task dispatch |
 | `DYTOPO_HOOK_GRAPH` | `knn` | Graph topology type |
 | `DYTOPO_AGENTS_YAML` | `./agents.yaml` | Path to agent registry |
@@ -152,7 +152,7 @@ Add to `.claude/settings.json` (global) or `.claude/settings.local.json` (projec
 
 ### How It Works
 
-```
+``` bash
 Claude dispatches Task tool
         ↓
 dytopo_hook.py scores all agents in agents.yaml against the prompt
@@ -243,11 +243,13 @@ Requires `agent_discovery.py` and `OPENAI_API_KEY`. See `LLM_DISCOVERY.md` for t
 
 ## Graph Types
 
-| Type | Best For |
-|---|---|
-| `knn` | Collaborative refinement — agents cross-pollinate context |
-| `threshold` | High-precision filtering — only strong matches communicate |
-| `star` | Central coordinator — all agents report to the top-ranked one |
+Topology types from the DyTopo paper (Chen et al., arXiv:2602.06039):
+
+| Type | When to Use | Behavior |
+| --- | --- | --- |
+| `knn` | Multi-step tasks needing collaboration | Each agent connects to its k nearest neighbors — agents cross-pollinate context across rounds |
+| `threshold` | High-precision or domain-specific tasks | Only agents above a similarity threshold communicate — strong matches only, no noise |
+| `star` | Tasks with a clear orchestrator | All agents report to the top-ranked agent — hub-and-spoke, good for synthesis or review tasks |
 
 ---
 
@@ -256,7 +258,7 @@ Requires `agent_discovery.py` and `OPENAI_API_KEY`. See `LLM_DISCOVERY.md` for t
 Example: 10 agents, 3 rounds of communication
 
 | Topology | Connections | Messages | Tokens (est.) |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Fully connected | 90 | 270 | ~135,000 |
 | DyTopo k=4, graph_k=2 | 8 | 24 | ~12,000 |
 
@@ -272,7 +274,7 @@ Example: 10 agents, 3 rounds of communication
 - **Atomic persistent cache**: `.dytopo_cache.json` — embed once, reuse forever; temp-file + rename for integrity
 - **Batch embed API**: `embed(..., _save=False)` + `flush()` for O(1) disk writes during bulk operations
 - **PreToolUse hook**: `dytopo_hook.py` — automatic routing on every Task dispatch
-- **Bootstrap script**: `bootstrap_agents.py` — populate `agents.yaml` from 300+ installed skills, built-in tools, and MCP servers; includes semantic pruner and scheduler
+- **Bootstrap script**: `bootstrap_agents.py` — populate `agents.yaml` from installed skills, built-in tools, and MCP servers; includes semantic pruner and scheduler
 - **Two new MCP tools**: `get_embedder_info`, `clear_embedding_cache`
 - **`agent_discovery` optional**: server starts cleanly without it; discovery tools return a clear error instead of crashing
 - **Public cache API**: `CachedEmbedder.cache_size`, `CachedEmbedder.cache_path` (no more private `_cache` access)
