@@ -57,11 +57,11 @@ python bootstrap_agents.py
 ```
 
 This scans:
-- **~/.claude/skills/** — all your installed `SKILL.md` files (~387 on a typical install)
+- **~/.claude/skills/** — all your installed `SKILL.md` files
 - **Built-in Claude Code tools** — Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, Task, etc.
 - **MCP servers** — from `claude_desktop_config.json`
 
-Result: `agents.yaml` with 300–400 real agents, ready for semantic routing.
+Result: `agents.yaml` populated with real agents from your environment, ready for semantic routing.
 
 **Optional: prune duplicate skills**
 

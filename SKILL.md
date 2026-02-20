@@ -83,9 +83,9 @@ DyTopo supports three embedding backends. Set via `DYTOPO_EMBEDDER` env var or a
 ### Auto-Detection Order
 
 ```
-OPENAI_API_KEY set?    → openai
-ANTHROPIC_API_KEY set? → anthropic
-Otherwise              → local (sentence-transformers, no key needed)
+OPENAI_API_KEY set?                          → openai
+VOYAGE_API_KEY or ANTHROPIC_API_KEY set?     → anthropic (Voyage AI)
+Otherwise                                    → local (sentence-transformers, no key needed)
 ```
 
 ### Provider Comparison
@@ -93,7 +93,7 @@ Otherwise              → local (sentence-transformers, no key needed)
 | Provider | Key Required | Quality | Cost | Latency |
 |---|---|---|---|---|
 | `openai` | Yes (OPENAI_API_KEY) | High | ~$0.00002/1K tokens | Low |
-| `anthropic` | Yes (ANTHROPIC_API_KEY) | High | Per Voyage pricing | Low |
+| `anthropic` | Yes (`VOYAGE_API_KEY` or `ANTHROPIC_API_KEY`) | High | Per Voyage pricing | Low |
 | `local` | None | Good | Free | First load only |
 
 ### Setting the Provider
@@ -608,9 +608,9 @@ print(f"Similarity: {result['similarity']}")
 # Switch to local (no API key, free, ~80MB download once)
 export DYTOPO_EMBEDDER=local
 
-# Switch to Anthropic/Voyage
+# Switch to Voyage AI
 export DYTOPO_EMBEDDER=anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
+export VOYAGE_API_KEY=pa-...       # or ANTHROPIC_API_KEY as alias
 
 # Keep OpenAI (original default)
 export DYTOPO_EMBEDDER=openai
@@ -757,7 +757,7 @@ final_result = synthesize(all_outputs)
 ## Bootstrap: Populate agents.yaml from Your Environment
 
 Out of the box, `agents.yaml` contains ~12 generic agents.
-`bootstrap_agents.py` replaces it with **your actual installed skills** (300+)
+`bootstrap_agents.py` replaces it with **your actual installed skills**
 plus built-in tools and MCP servers — automatically.
 
 ### Quick Start
@@ -811,7 +811,7 @@ For system-level scheduling, use `cron` (Linux/macOS) or Task Scheduler (Windows
 
 ### Semantic Pruner
 
-With 300+ skills, many are semantically redundant. The pruner uses cosine
+When many skills are installed, they are often semantically redundant. The pruner uses cosine
 similarity to cluster descriptions and removes duplicates automatically.
 
 ```
