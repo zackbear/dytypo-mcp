@@ -11,7 +11,7 @@ def scored(*pairs):
 
 SCORES = scored(("python-testing-patterns", 0.50), ("uv-package-manager", 0.36),
                 ("temporal-python-testing", 0.44), ("mcp_muninn", 0.15),
-                ("mcp_mcp_docker", 0.31), ("mcp_public_browser", 0.23))
+                ("mcp_mcp_docker", 0.31), ("mcp_github", 0.12), ("mcp_public_browser", 0.23))
 
 
 def ids(sel):
@@ -29,8 +29,8 @@ def test_remember_pins_muninn_first_and_keeps_k():
     assert sel[0]["matched_rule"]
 
 
-def test_open_pr_pins_docker():
-    assert ids(h.select_agents(SCORES, "open a PR on my repo with these changes", 3))[0] == "mcp_mcp_docker"
+def test_open_pr_pins_github_server():
+    assert ids(h.select_agents(SCORES, "open a PR on my repo with these changes", 3))[0] == "mcp_github"
 
 
 def test_form_fill_pins_browser():
@@ -45,7 +45,7 @@ def test_rule_for_unregistered_agent_is_ignored():
 
 def test_word_boundaries_avoid_false_positives():
     # "approximate" contains "pr", "remembering" is fine to match, "prefix" must not hit PR rule
-    assert "mcp_mcp_docker" not in ids(h.select_agents(SCORES, "approximate the prefix sums", 1))
+    assert "mcp_github" not in ids(h.select_agents(SCORES, "approximate the prefix sums", 1))
 
 
 def run_main(monkeypatch, capsys, payload):

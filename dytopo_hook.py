@@ -78,7 +78,9 @@ INTENT_RULES: dict[str, re.Pattern] = {
     "mcp_muninn": re.compile(
         r"\b(remember|memori[sz]e|recall|don'?t forget|note that|"
         r"what did (we|i) (decide|agree|say)|my preference)\b", re.I),
-    "mcp_mcp_docker": re.compile(
+    # The official GitHub MCP server; the Docker gateway also bundles GitHub, but Jev
+    # ranks it lower for repo work, so the rule shouldn't override that.
+    "mcp_github": re.compile(
         r"\b(pull request|PR|open an? PR|merge the PR|github (issue|repo))\b", re.I),
     "superpowers:brainstorming": re.compile(
         r"\b(brainstorm\w*|ideas? (for|on|about)|come up with ideas|"
