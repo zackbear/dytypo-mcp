@@ -155,3 +155,20 @@ def test_brainstorm_intent_pins_brainstorming():
 
 def test_implementation_task_does_not_pin_brainstorming():
     assert ids(h.select_agents(BRAINSTORM_SCORES, "implement the onboarding feature per the spec", 2))[0] == "zapier:zapier-onboard"
+
+
+def test_load_agents_uses_libyaml_when_available(tmp_path, monkeypatch):
+    write_registry(tmp_path, monkeypatch)
+    import yaml
+    used = []
+    real = yaml.load
+    monkeypatch.setattr(yaml, "load", lambda stream, Loader: used.append(Loader) or real(stream, Loader=Loader))
+    assert [a["id"] for a in h.load_agents()] == ["a", "b"]
+    assert used == [yaml.CSafeLoader]
+
+
+def test_load_agents_falls_back_without_libyaml(tmp_path, monkeypatch):
+    write_registry(tmp_path, monkeypatch)
+    import yaml
+    monkeypatch.delattr(yaml, "CSafeLoader", raising=False)
+    assert [a["id"] for a in h.load_agents()] == ["a", "b"]
