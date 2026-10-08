@@ -46,3 +46,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+agents.yaml.bak*
+.coverage
+# Personal: describes the tools installed on this machine (like agents.yaml)
+description_overrides.yaml

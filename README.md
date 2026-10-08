@@ -117,22 +117,22 @@ After:   ~260 agents  (varies by threshold, default 0.92)
 
 ## Claude Code PreToolUse Hook
 
-The hook automatically intercepts every Task tool dispatch and injects a DyTopo routing plan into the prompt, guiding Claude to pick the right `subagent_type`.
+The hook intercepts every subagent dispatch (`Agent`, formerly `Task`) and appends a short "DyTopo routing hint" to the subagent's prompt: the tools and skills from `agents.yaml` that best fit the task.
 
 ### Setup
 
-Add to `.claude/settings.json` (global) or `.claude/settings.local.json` (project):
+Add to `.claude/settings.json` (global) or `.claude/settings.local.json` (project). Use the full path of the Python that has this repo's dependencies installed:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Agent|Task",
         "hooks": [
           {
             "type": "command",
-            "command": "python /path/to/dytopo-mcp/dytopo_hook.py"
+            "command": "\"/path/to/python\" \"/path/to/dytopo-mcp/dytopo_hook.py\""
           }
         ]
       }
@@ -141,28 +141,40 @@ Add to `.claude/settings.json` (global) or `.claude/settings.local.json` (projec
 }
 ```
 
+### Ranking with Jev
+
+The hook ranks the registry with [TypeSafe](https://docs.typesafe.ai)'s Jev decision model (`jev_router.py`). It makes one System One request, which takes about 0.3s and needs no embeddings. The API allows at most 255 options per `choice` question, so a larger registry is split across several questions in the same request. Each question also gets a `none_fit` option, so probabilities from different questions can be compared. Intent rules (for example "remember…" → MuninnDB) still put their entry first.
+
+The hook needs a key: `TYPESAFE_API_KEY` (direct, preferred) or `AI_GATEWAY_API_KEY` (through Vercel's AI Gateway). It checks the environment first, then **Windows Credential Manager**. On Windows, store keys there rather than in `.env`:
+
+```bash
+python secret_store.py set TYPESAFE_API_KEY   # hidden prompt; stored as dytopo/TYPESAFE_API_KEY
+```
+
+With no key, or if Jev fails or times out, the hook passes the call through unchanged. There is no embedding fallback: per-call hook processes can't afford sentence-transformers' ~20s import.
+
 ### Hook Environment Variables
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `DYTOPO_HOOK_K` | `3` | Agents selected per Task dispatch |
-| `DYTOPO_HOOK_GRAPH` | `knn` | Graph topology type |
+| `TYPESAFE_API_KEY` / `AI_GATEWAY_API_KEY` | (Credential Manager) | Jev credentials |
+| `DYTOPO_JEV_TIMEOUT` | `5` | Seconds before giving up and passing the call through |
+| `DYTOPO_HOOK_K` | `3` | Entries suggested per dispatch |
 | `DYTOPO_AGENTS_YAML` | `./agents.yaml` | Path to agent registry |
-| `DYTOPO_EMBEDDER` | auto | Embedding provider |
 
 ### How It Works
 
 ``` bash
-Claude dispatches Task tool
+Claude dispatches the Agent tool
         ↓
-dytopo_hook.py scores all agents in agents.yaml against the prompt
+dytopo_hook.py asks Jev to rank every agents.yaml entry for the prompt
         ↓
-Appends ranking: top-k agents, scores, recommended subagent_type
+Appends the top-k tools/skills (and how to invoke each) to the subagent's prompt
         ↓
-Claude uses the annotation to pick the semantically correct subagent
+The subagent reaches for those where they fit
 ```
 
-The hook **never blocks** — if it errors, the Task proceeds unmodified.
+The hook **never blocks**: if anything fails, the call proceeds unmodified.
 
 ---
 
