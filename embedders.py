@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -251,7 +252,8 @@ def get_embedder(provider: str | None = None) -> CachedEmbedder:
             "Choose from: openai, anthropic, local"
         )
 
-    print(f"[DyTopo] Embedding provider: {provider}")
+    # stderr: stdout is the hook's JSON channel and the MCP server's protocol stream
+    print(f"[DyTopo] Embedding provider: {provider}", file=sys.stderr)
     return CachedEmbedder(inner)
 
 

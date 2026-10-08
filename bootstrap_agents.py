@@ -75,6 +75,7 @@ def _default_mcp_configs() -> list[Path]:
 
 DEFAULT_MCP_CONFIGS = _default_mcp_configs()
 DEFAULT_PRUNE_THRESHOLD = float(os.getenv("DYTOPO_PRUNE_THRESHOLD", "0.92"))
+DEFAULT_OVERRIDES = Path(os.getenv("DYTOPO_DESCRIPTION_OVERRIDES", REPO_DIR / "description_overrides.yaml"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -269,6 +270,41 @@ def scan_skills(skills_dir: Path) -> list[dict]:
 # MCP CONFIG SCANNER
 # ─────────────────────────────────────────────────────────────────────────────
 
+def load_description_overrides(path: Path) -> dict[str, str]:
+    """Load hand-written {agent_id: description} overrides; {} if absent or invalid."""
+    if not path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[bootstrap] Could not read {path}: {e}", file=sys.stderr)
+        return {}
+    if not isinstance(data, dict):
+        print(f"[bootstrap] {path} must be a mapping of agent id -> description; ignoring.", file=sys.stderr)
+        return {}
+    return {str(k): str(v).strip() for k, v in data.items() if v}
+
+
+def apply_description_overrides(agents: list[dict], overrides: dict[str, str]) -> list[dict]:
+    """Swap in hand-written descriptions by agent id (without editing SKILL.md files).
+
+    MCP configs carry no semantic info, so an MCP server without an override is
+    registered as a placeholder that routing can only match by name — warn about it.
+    """
+    ids = {a["id"] for a in agents}
+    for stale in sorted(set(overrides) - ids):
+        print(f"[bootstrap] Override for unknown agent '{stale}' (uninstalled?) — ignoring.", file=sys.stderr)
+    out = []
+    for a in agents:
+        if a["id"] in overrides:
+            a = dict(a, description=overrides[a["id"]],
+                     metadata=dict(a.get("metadata") or {}, description_override=True))
+        elif (a.get("metadata") or {}).get("category") == "mcp":
+            print(f"[bootstrap] No description for '{a['id']}' — add one to {DEFAULT_OVERRIDES.name}", file=sys.stderr)
+        out.append(a)
+    return out
+
+
 def scan_mcp_servers(config_paths: list[Path]) -> list[dict]:
     """Parse MCP config files and return one agent per registered server."""
     agents: list[dict] = []
@@ -285,7 +321,7 @@ def scan_mcp_servers(config_paths: list[Path]) -> list[dict]:
 
         servers: dict = data.get("mcpServers", {})
         for name, cfg in servers.items():
-            agent_id = f"mcp_{re.sub(r'[^\\w]', '_', name.lower())}"
+            agent_id = "mcp_" + re.sub(r"\W", "_", name.lower())
             if agent_id in seen:
                 continue
             seen.add(agent_id)
@@ -348,9 +384,8 @@ def prune_by_similarity(
     """
     try:
         import numpy as np
-        from sklearn.metrics.pairwise import cosine_similarity as cos_sim
     except ImportError:
-        print("[bootstrap] scikit-learn not installed — skipping semantic prune.", file=sys.stderr)
+        print("[bootstrap] numpy not installed — skipping semantic prune.", file=sys.stderr)
         return agents
 
     sys.path.insert(0, str(REPO_DIR))
@@ -368,7 +403,8 @@ def prune_by_similarity(
     embedder.flush()  # single atomic write instead of N writes
 
     matrix = np.vstack(vecs)  # shape (N, dim)
-    sim_matrix = cos_sim(matrix)  # (N, N)
+    unit = matrix / np.clip(np.linalg.norm(matrix, axis=1, keepdims=True), 1e-12, None)
+    sim_matrix = unit @ unit.T  # (N, N) cosine similarity
 
     removed: set[int] = set()
     clusters: list[tuple[int, int, float]] = []  # (keeper_idx, removed_idx, score)
@@ -491,10 +527,11 @@ def run(
         all_agents.extend(BUILTIN_TOOLS)
         print(f"[bootstrap] Built-in tools loaded: {len(BUILTIN_TOOLS)}", file=sys.stderr)
 
-    # 2. Installed skills
+    # 2. Installed skills, then plugin skills (ids are "plugin:skill", so no clashes)
     if include_skills:
-        skill_agents = scan_skills(skills_dir)
-        all_agents.extend(skill_agents)
+        from plugin_scanner import scan_plugin_skills  # local: plugin_scanner imports this module
+        all_agents.extend(scan_skills(skills_dir))
+        all_agents.extend(scan_plugin_skills())
 
     # 3. MCP servers
     if include_mcp:
@@ -509,6 +546,7 @@ def run(
             f"[bootstrap] Deduped by ID: {before_dedup} -> {len(all_agents)}",
             file=sys.stderr,
         )
+    all_agents = apply_description_overrides(all_agents, load_description_overrides(DEFAULT_OVERRIDES))
 
     # Semantic prune
     if prune:
