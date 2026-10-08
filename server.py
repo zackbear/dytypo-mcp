@@ -4,11 +4,11 @@ DyTopo MCP Server - Dynamic Topology Routing for Multi-Agent Systems
 Provides semantic matching and dynamic graph construction for agent routing.
 """
 
+import sys
 import json
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict
-from sklearn.metrics.pairwise import cosine_similarity
 import os
 from pathlib import Path
 import yaml
@@ -60,7 +60,9 @@ class DyTopoRouter:
     def __init__(self):
         self.agents: Dict[str, Agent] = {}
         self.embedder: CachedEmbedder = get_embedder()
-        self.discovery = AgentDiscovery() if _DISCOVERY_AVAILABLE else None
+        # Discovery is an optional OpenAI-backed feature; without a key, leave it off
+        # (the tool handler reports it as unavailable) instead of crashing on import.
+        self.discovery = AgentDiscovery() if _DISCOVERY_AVAILABLE and os.getenv("OPENAI_API_KEY") else None
 
         # Auto-load agents from config file
         self._load_agents_from_config()
@@ -75,7 +77,7 @@ class DyTopoRouter:
             if fallback_path.exists():
                 config_path = fallback_path
                 print("[DyTopo] agents.yaml not found — loading agents.example.yaml. "
-                      "Run 'python bootstrap_agents.py' to generate your own agents.yaml.")
+                      "Run 'python bootstrap_agents.py' to generate your own agents.yaml.", file=sys.stderr)
             else:
                 return
 
@@ -93,10 +95,10 @@ class DyTopoRouter:
 
                 self.register_agent(agent_id, description, metadata)
 
-            print(f"[DyTopo] Loaded {len(config['agents'])} agents from {config_path.name}")
+            print(f"[DyTopo] Loaded {len(config['agents'])} agents from {config_path.name}", file=sys.stderr)
 
         except Exception as e:
-            print(f"[DyTopo] Warning: Could not load {config_path.name}: {e}")
+            print(f"[DyTopo] Warning: Could not load {config_path.name}: {e}", file=sys.stderr)
 
 
     def embed_text(self, text: str) -> np.ndarray:
@@ -117,7 +119,8 @@ class DyTopoRouter:
 
     def compute_relevance(self, task_embedding: np.ndarray, agent_embedding: np.ndarray) -> float:
         """Compute semantic relevance score."""
-        return float(cosine_similarity([task_embedding], [agent_embedding])[0][0])
+        a, b = np.asarray(task_embedding, dtype=float), np.asarray(agent_embedding, dtype=float)
+        return float(a @ b / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-12))
 
     def select_top_k(self, task_text: str, k: int) -> List[Tuple[str, float]]:
         """Select top-k most relevant agents for task."""
