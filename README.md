@@ -18,7 +18,7 @@ Instead of fixed topologies and broadcasting to all agents, you get:
 - Task-conditioned agent selection via semantic similarity
 - Sparse communication graphs (k-NN, star, or threshold)
 - Automatic topology construction — no manual routing logic
-- **Automatic subagent guidance** via the Claude Code PreToolUse hook
+- **Automatic subagent guidance** via the Claude Code PreToolUse hook, ranked by TypeSafe's Jev model in ~0.3s
 
 ---
 
@@ -33,13 +33,13 @@ pip install -r requirements.txt
 
 ## Embedding Providers
 
-DyTopo supports three embedding backends. Set `DYTOPO_EMBEDDER` or let it auto-detect:
+The **MCP server** (`server.py`) and the bootstrap pruner use embeddings. The hook does not; it ranks with Jev (see [below](#ranking-with-jev)). Set `DYTOPO_EMBEDDER` or let it auto-detect:
 
 | Provider | Key Required | Package | Notes |
-| -------- | ------------ | --------|
+| -------- | ------------ | ------- | ----- |
 | `openai` | `OPENAI_API_KEY` | `openai` | Default if key present. `text-embedding-3-small`. |
 | `anthropic` | `VOYAGE_API_KEY` (or `ANTHROPIC_API_KEY`) | `voyageai` | Voyage AI `voyage-3-lite`. |
-| `local` | None | `sentence-transformers` | Free, ~80 MB model download on first use. |
+| `local` | None | `sentence-transformers` | Free, ~80 MB model download on first use. The import takes ~20s, which a long-running server pays only once at startup. |
 
 **Auto-detection order**: openai → anthropic (Voyage) → local
 
@@ -65,7 +65,7 @@ All providers cache embeddings to `.dytopo_cache.json`. Each text is embedded **
 
 ## Bootstrap: Populate agents.yaml from Your Environment
 
-Out of the box, `agents.yaml` has ~12 generic agents. `bootstrap_agents.py` replaces it with your **actual installed skills**, built-in Claude Code tools, and MCP servers — automatically.
+Out of the box, the server falls back to `agents.example.yaml` (14 generic agents). `bootstrap_agents.py` generates your own `agents.yaml` automatically from your **actual installed skills**, plugin skills, built-in Claude Code tools and MCP servers.
 
 ### Quick Start
 
@@ -85,8 +85,21 @@ python bootstrap_agents.py --prune --dry-run --threshold 0.90
 | Source | Default Location |
 | ---- | --- |
 | Built-in Claude Code tools | hardcoded (Bash, Read, Write, Edit, Glob, Grep, WebSearch, …) |
-| Installed skills | `~/.claude/skills/` — reads each `SKILL.md` |
+| Installed skills | `~/.claude/skills/`: reads each `SKILL.md` |
+| Plugin skills | `~/.claude/plugins/`: marketplace plugins enabled in `settings.json` (`enabledPlugins`), plus plugins synced from claude.ai. Ids are `plugin:skill`, the name the Skill tool accepts |
 | MCP servers | `claude_desktop_config.json` / `.claude.json` |
+
+### Description Overrides
+
+Routing is only as good as the descriptions. MCP configs carry no description at all, and some `SKILL.md` descriptions are too terse to match on. Put hand-written replacements in `description_overrides.yaml` (gitignored; override the path with `DYTOPO_DESCRIPTION_OVERRIDES`), keyed by agent id. Your `SKILL.md` files are never touched:
+
+```yaml
+mcp_muninn: >-
+  Long-term memory database. Remember, store, recall and link facts,
+  preferences and decisions across sessions.
+```
+
+Re-run `bootstrap_agents.py` after editing. It warns about MCP servers that still have no description, and about overrides for agents that are no longer installed.
 
 ### Scheduled Execution
 
@@ -261,7 +274,7 @@ Returns selected agents, topology graph, and BFS execution order.
 
 **`suggest_agents_for_domain`**, **`improve_agent_description`**, **`analyze_agent_coverage`**, **`discover_agents_from_tools`**, **`suggest_missing_agents`**
 
-Requires `agent_discovery.py` and `OPENAI_API_KEY`. See `LLM_DISCOVERY.md` for the full guide.
+Requires `agent_discovery.py` and `OPENAI_API_KEY`. Without them the server still starts, and these tools report that discovery is unavailable. See `LLM_DISCOVERY.md` for the full guide.
 
 ---
 
@@ -292,6 +305,17 @@ Example: 10 agents, 3 rounds of communication
 
 ## Changelog
 
+### Unreleased
+
+- **Jev routing in the hook** (`jev_router.py`): ranks the whole registry in one TypeSafe System One request (~0.3s, vs ~5s for embeddings plus cache load). The registry is split into choice questions of at most 255 options, each with a `none_fit` option. Uses `TYPESAFE_API_KEY` first, then `AI_GATEWAY_API_KEY`; redirects are refused
+- **Hook passes calls through** when there is no Jev key or Jev fails; the embedding fallback is removed
+- **Hook hint names tools and skills**, with how to invoke each, instead of a `subagent_type`. The matcher is now `Agent|Task`
+- **Windows Credential Manager for API keys** (`secret_store.py`): env vars first, then `dytopo/NAME`
+- **Plugin skill scanning** (`plugin_scanner.py`) and **description overrides** in bootstrap
+- **scikit-learn removed**: cosine similarity is computed with numpy
+- **Fix**: the server no longer crashes on startup without `OPENAI_API_KEY`
+- Logging goes to stderr (stdout is the hook's JSON channel and the MCP protocol stream). Core requirements are pinned
+
 ### v0.2.0
 
 - **Pluggable embedding providers**: OpenAI (`text-embedding-3-small`), Voyage AI (`voyage-3-lite`), or local (`sentence-transformers`)
@@ -315,6 +339,8 @@ Example: 10 agents, 3 rounds of communication
 - Routing quality depends on agent description clarity — generic descriptions produce poor matches
 - No built-in agent execution — DyTopo is a routing layer only
 - Local embedder slightly lower quality than API-based providers
+- The hook's routing needs network access and a TypeSafe key; without them, calls go through without a hint
+- Credential Manager storage is Windows-only; other platforms use env vars or `.env`
 - Semantic pruner is O(N²) — with thousands of agents, use a higher threshold or skip `--prune`
 
 ---
