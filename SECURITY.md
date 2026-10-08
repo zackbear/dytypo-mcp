@@ -50,7 +50,7 @@ MCP server descriptions built from your `claude_desktop_config.json` include ser
 
 ### Key Storage
 
-Store keys in `.env` (gitignored by default) or your shell profile. Never commit keys to version control. The `.gitignore` included in this repo excludes `.env` and `.dytopo_cache.json`.
+On Windows, prefer **Credential Manager**: `python secret_store.py set NAME` stores the key DPAPI-encrypted under your login as `dytopo/NAME`. The hook checks env vars first, then Credential Manager. It keeps keys out of plaintext files and out of synced or backed-up copies of the repo. It does not protect against code already running as you. Otherwise use `.env` (gitignored by default) or your shell profile. Never commit keys to version control. The `.gitignore` included in this repo excludes `.env` and `.dytopo_cache.json`.
 
 ---
 
@@ -106,15 +106,17 @@ Core dependencies and their roles:
 | Package | Purpose | Network access |
 | --- | --- | --- |
 | `mcp` | MCP stdio transport | stdio only |
-| `numpy` / `scikit-learn` | Vector math | None |
+| `numpy` | Vector math | None |
 | `pyyaml` | YAML parsing | None |
 | `python-dotenv` | `.env` loading | None |
 | `openai` | Embeddings (if configured) | `api.openai.com` |
 | `voyageai` | Embeddings (if configured) | `api.voyageai.com` |
 | `sentence-transformers` | Local embeddings (if configured) | HuggingFace (first download only) |
 | `schedule` | Scheduler for bootstrap | None |
+| `pywin32` (Windows) | Credential Manager access (`secret_store.py`) | None |
+| stdlib `urllib` | Jev routing (`jev_router.py`) | `api.typesafe.ai` or `ai-gateway.vercel.sh`; redirects are refused so the `Authorization` header can't follow a 3xx |
 
-Pin dependencies in production environments. The `requirements.txt` specifies minimum versions (`>=`); use `pip freeze` to lock exact versions.
+`requirements.txt` pins exact versions for the core and tested packages.
 
 ---
 

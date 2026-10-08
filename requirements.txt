@@ -1,14 +1,16 @@
 # Core
-mcp>=0.9.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-python-dotenv>=1.0.0
-pyyaml>=6.0.0
+mcp==1.30.0                      # <2: server.py uses the 1.x decorator API
+numpy==2.5.3
+python-dotenv==1.2.4
+pyyaml==6.0.3
 
 # Embedding providers (install at least one)
-openai>=1.0.0                   # For DYTOPO_EMBEDDER=openai
+openai==3.26.0                  # For DYTOPO_EMBEDDER=openai
 voyageai>=0.2.0                 # For DYTOPO_EMBEDDER=anthropic  (pip install voyageai)
-sentence-transformers>=2.7.0    # For DYTOPO_EMBEDDER=local (no API key needed)
+sentence-transformers==6.1.0     # For DYTOPO_EMBEDDER=local (no API key needed)
 
 # Optional: scheduling support for bootstrap_agents.py --schedule
 schedule>=1.2.0                 # pip install schedule
+
+# Windows Credential Manager for API keys (secret_store.py); optional, falls back to env
+pywin32==312; sys_platform == "win32"

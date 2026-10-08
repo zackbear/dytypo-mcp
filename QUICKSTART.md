@@ -15,13 +15,13 @@ pip install -r requirements.txt
 
 ## 2. Choose an Embedding Provider
 
-Pick one — or use local mode (no API key needed):
+Embeddings power the MCP server and the bootstrap pruner. The hook doesn't use them; it ranks with Jev (step 4). Pick one, or use local mode (no API key needed):
 
 **Option A — Local (free, no key)**
 
 ```bash
 export DYTOPO_EMBEDDER=local
-# Downloads ~80 MB model on first use
+# Downloads ~80 MB model on first use; the import takes ~20s at server startup
 ```
 
 **Option B — OpenAI**
@@ -66,9 +66,12 @@ cp agents.example.yaml agents.yaml
 ```
 
 This scans:
-- **~/.claude/skills/** — all your installed `SKILL.md` files
-- **Built-in Claude Code tools** — Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, Task, etc.
-- **MCP servers** — from `claude_desktop_config.json`
+- **~/.claude/skills/**: all your installed `SKILL.md` files
+- **Plugin skills**: enabled marketplace plugins and plugins synced from claude.ai (ids like `superpowers:brainstorming`)
+- **Built-in Claude Code tools**: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, Agent, etc.
+- **MCP servers**: from `claude_desktop_config.json`
+
+MCP servers come with no description. Add one per server (and fix any terse skill descriptions) in `description_overrides.yaml`; see the README's "Description Overrides" section.
 
 Result: `agents.yaml` populated with real agents from your environment, ready for semantic routing.
 
@@ -90,20 +93,28 @@ python bootstrap_agents.py --schedule 08:30    # daily at 8:30 AM
 
 ## 4. Configure the Claude Code Hook (Recommended)
 
-The hook automatically injects a routing plan into every Task tool dispatch — no manual invocation needed.
+The hook appends a short routing hint to every subagent dispatch (the `Agent` tool, formerly `Task`): the tools and skills that best fit the task, with how to invoke each. You don't need to call anything yourself.
 
-Add to `~/.claude/settings.json` (global) or `.claude/settings.local.json` (project-local):
+**a. Give it a TypeSafe key.** The hook ranks with TypeSafe's Jev model (one ~0.3s request). Get a key at [typesafe.ai](https://docs.typesafe.ai). On Windows, store it in Credential Manager:
+
+```bash
+python secret_store.py set TYPESAFE_API_KEY   # hidden prompt; stored as dytopo/TYPESAFE_API_KEY
+```
+
+Elsewhere, set `TYPESAFE_API_KEY` in your environment or `.env`. A Vercel `AI_GATEWAY_API_KEY` also works.
+
+**b. Register the hook** in `~/.claude/settings.json` (global) or `.claude/settings.local.json` (project-local). Use the full path of the Python that has the dependencies installed:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Agent|Task",
         "hooks": [
           {
             "type": "command",
-            "command": "python /absolute/path/to/dytopo-mcp/dytopo_hook.py"
+            "command": "\"/absolute/path/to/python\" \"/absolute/path/to/dytopo-mcp/dytopo_hook.py\""
           }
         ]
       }
@@ -112,7 +123,7 @@ Add to `~/.claude/settings.json` (global) or `.claude/settings.local.json` (proj
 }
 ```
 
-Now every time Claude spawns a subagent via the Task tool, DyTopo silently annotates the prompt with the top-k semantically matched agents.
+Now every subagent Claude spawns gets a "DyTopo routing hint" at the end of its prompt. With no key, or if Jev is unreachable, the hook stays out of the way and the call goes through unchanged.
 
 ---
 
@@ -164,13 +175,21 @@ Agent descriptions are too generic. Run bootstrap with pruning to consolidate, o
 
 ### Hook not firing
 
-Check the path in `settings.json` is absolute. Test manually:
+Check that both paths in the hook `command` are absolute and that the Python exists; a missing interpreter shows up as exit code 127. Test manually with that same Python:
 
 ```bash
-echo '{"tool_name":"Task","tool_input":{"prompt":"build a login form"}}' | python dytopo_hook.py
+echo '{"tool_name":"Agent","tool_input":{"prompt":"build a login form"}}' | /absolute/path/to/python dytopo_hook.py
 ```
 
-You should see a JSON response with the prompt annotated.
+You should see a JSON response with the prompt annotated, and `[DyTopo hook] Routed to: …` on stderr.
+
+### Hook runs but adds no hint
+
+stdout is empty and stderr explains why:
+
+- **Nothing on stderr**: no Jev key found. Run `python secret_store.py set TYPESAFE_API_KEY`, or set the env var.
+- **`Jev failed, skipping routing: HTTP 401`**: the key is wrong or revoked. Store the new one with the same command.
+- **`HTTP 429` / `529` or a timeout**: TypeSafe is rate-limiting or busy. Calls still go through; raise `DYTOPO_JEV_TIMEOUT` if timeouts are frequent.
 
 ### "No module named yaml" (or any missing module)
 
@@ -192,7 +211,7 @@ venv\Scripts\activate         # Windows
 pip install -r requirements.txt
 ```
 
-For the hook, make sure the `command` in `settings.json` points to the **same Python** that has the dependencies installed — use the full path if needed (e.g. `/path/to/venv/bin/python`).
+For the hook, make sure the `command` in `settings.json` points to the **same Python** that has the dependencies installed. Always use the full path (e.g. `/path/to/venv/bin/python`): if that Python is later removed or moved, every hook run fails with exit code 127.
 
 ### Voyage AI / anthropic provider fails
 
