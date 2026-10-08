@@ -50,3 +50,5 @@ agents.yaml.bak*
 .coverage
 # Personal: describes the tools installed on this machine (like agents.yaml)
 description_overrides.yaml
+# Output of the scheduled bootstrap run (Task Scheduler: dytopo-bootstrap)
+bootstrap.log

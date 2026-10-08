@@ -52,3 +52,16 @@ def test_scan_parses_cli_output(monkeypatch):
     monkeypatch.setattr(c.subprocess, "run",
                         lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=SAMPLE, stderr=""))
     assert len(c.scan_claude_ai_connectors()) == 2
+
+
+def test_scan_hides_console_window_on_windows(monkeypatch):
+    seen = {}
+
+    def fake_run(*a, **k):
+        seen.update(k)
+        return subprocess.CompletedProcess(a, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(c.subprocess, "run", fake_run)
+    c.scan_claude_ai_connectors()
+    if sys.platform == "win32":
+        assert seen["creationflags"] & subprocess.CREATE_NO_WINDOW

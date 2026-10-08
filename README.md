@@ -118,6 +118,19 @@ python bootstrap_agents.py --schedule fri@17:00
 Supported schedule expressions: `daily`, `weekly`, `HH:MM`, `DAY@HH:MM`
 For system-level scheduling use cron (macOS/Linux) or Task Scheduler (Windows) to call the script directly — no `schedule` package needed.
 
+On Windows, this registers a daily run that opens no console window and logs to `bootstrap.log`. Missed runs (PC off) run at the next chance:
+
+```powershell
+$repo = "C:\path	o\dytopo-mcp"
+$run  = '-c "import sys,runpy; f=open(''bootstrap.log'',''w'',encoding=''utf-8''); sys.stdout=sys.stderr=f; sys.argv=[''bootstrap_agents.py'']; runpy.run_path(''bootstrap_agents.py'', run_name=''__main__'')"'
+Register-ScheduledTask -TaskName dytopo-bootstrap `
+  -Action (New-ScheduledTaskAction -Execute "C:\path	o\pythonw.exe" -Argument $run -WorkingDirectory $repo) `
+  -Trigger (New-ScheduledTaskTrigger -Daily -At 9:00am) `
+  -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10))
+```
+
+`agents.yaml` is written to a temp file and renamed into place, so the hook never reads a half-written registry during a scheduled run. Check `bootstrap.log` for `No description for …` lines: these are new MCP servers or connectors that need an entry in `description_overrides.yaml`.
+
 ### Semantic Pruner
 
 When many skills are installed, they are often semantically redundant. `--prune` computes pairwise cosine similarity and removes near-duplicates, keeping the richer (longer) description.

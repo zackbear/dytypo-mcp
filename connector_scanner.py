@@ -50,7 +50,10 @@ def scan_claude_ai_connectors() -> list[dict]:
     claude = shutil.which("claude") or "claude"  # resolves claude.cmd on Windows
     try:
         out = subprocess.run([claude, "mcp", "list"], capture_output=True, text=True,
-                             encoding="utf-8", errors="replace", timeout=LIST_TIMEOUT_S)
+                             encoding="utf-8", errors="replace", timeout=LIST_TIMEOUT_S,
+                             # claude is a .cmd shim on Windows: don't flash a console
+                             # when bootstrap runs from Task Scheduler.
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.TimeoutExpired) as e:
         print(f"[bootstrap] Skipping claude.ai connectors: `claude mcp list` failed: {e}", file=sys.stderr)
         return []

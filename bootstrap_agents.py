@@ -492,7 +492,14 @@ def write_agents_yaml(agents: list[dict], output_path: Path) -> None:
     )
 
     yaml_body = yaml.dump(doc, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=120)
-    output_path.write_text(header + yaml_body, encoding="utf-8")
+    # Temp file + rename: the hook reads agents.yaml on every subagent dispatch and
+    # must never see a half-written file (e.g. during a scheduled re-run).
+    tmp = output_path.with_name(output_path.name + ".tmp")
+    try:
+        tmp.write_text(header + yaml_body, encoding="utf-8")
+        tmp.replace(output_path)
+    finally:
+        tmp.unlink(missing_ok=True)
     print(f"\n[bootstrap] Written: {output_path}  ({len(agents)} agents)", file=sys.stderr)
 
 
