@@ -6,6 +6,7 @@ Scans three sources:
   1. ~/.claude/skills/   — all installed SKILL.md files
   2. Built-in Claude Code tools (Bash, Read, Write, Edit, Glob, Grep, etc.)
   3. MCP server configs  (claude_desktop_config.json / .claude.json)
+     and connected claude.ai connectors (`claude mcp list`)
 
 Then optionally PRUNES the resulting registry:
   --prune     Remove duplicate/redundant skills by semantic similarity
@@ -484,14 +485,21 @@ def write_agents_yaml(agents: list[dict], output_path: Path) -> None:
         "# Sources:\n"
         "#   - Built-in Claude Code tools\n"
         "#   - ~/.claude/skills/  (SKILL.md files)\n"
-        "#   - MCP server configs\n"
+        "#   - MCP server configs and claude.ai connectors\n"
         "#\n"
         "# Re-run:  python bootstrap_agents.py\n"
         "# Prune:   python bootstrap_agents.py --prune\n\n"
     )
 
     yaml_body = yaml.dump(doc, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=120)
-    output_path.write_text(header + yaml_body, encoding="utf-8")
+    # Temp file + rename: the hook reads agents.yaml on every subagent dispatch and
+    # must never see a half-written file (e.g. during a scheduled re-run).
+    tmp = output_path.with_name(output_path.name + ".tmp")
+    try:
+        tmp.write_text(header + yaml_body, encoding="utf-8")
+        tmp.replace(output_path)
+    finally:
+        tmp.unlink(missing_ok=True)
     print(f"\n[bootstrap] Written: {output_path}  ({len(agents)} agents)", file=sys.stderr)
 
 
@@ -533,10 +541,11 @@ def run(
         all_agents.extend(scan_skills(skills_dir))
         all_agents.extend(scan_plugin_skills())
 
-    # 3. MCP servers
+    # 3. MCP servers: local configs, then claude.ai connectors (not in any local config)
     if include_mcp:
-        mcp_agents = scan_mcp_servers(mcp_config_paths)
-        all_agents.extend(mcp_agents)
+        from connector_scanner import scan_claude_ai_connectors
+        all_agents.extend(scan_mcp_servers(mcp_config_paths))
+        all_agents.extend(scan_claude_ai_connectors())
 
     # Deduplicate by ID (same skill installed in multiple locations)
     before_dedup = len(all_agents)

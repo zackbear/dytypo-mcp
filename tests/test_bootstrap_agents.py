@@ -54,3 +54,26 @@ def test_load_overrides_reads_mapping(tmp_path):
     p = tmp_path / "d.yaml"
     p.write_text("mcp_muninn: Stores memories.\n", encoding="utf-8")
     assert b.load_description_overrides(p) == {"mcp_muninn": "Stores memories."}
+
+
+def test_write_agents_yaml_is_atomic(tmp_path, monkeypatch):
+    # The hook may read agents.yaml at any moment; a failed write must leave the old file whole.
+    out = tmp_path / "agents.yaml"
+    out.write_text("agents:\n- id: old\n  description: Old\n", encoding="utf-8")
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    import pytest
+    with pytest.raises(OSError):
+        b.write_agents_yaml([{"id": "new", "description": "New"}], out)
+    assert "id: old" in out.read_text(encoding="utf-8")
+    assert [p.name for p in tmp_path.iterdir()] == ["agents.yaml"]  # temp file cleaned up
+
+
+def test_write_agents_yaml_round_trips(tmp_path):
+    import yaml
+    out = tmp_path / "agents.yaml"
+    b.write_agents_yaml([{"id": "a", "description": "A"}], out)
+    assert yaml.safe_load(out.read_text(encoding="utf-8"))["agents"] == [{"id": "a", "description": "A"}]

@@ -88,6 +88,7 @@ python bootstrap_agents.py --prune --dry-run --threshold 0.90
 | Installed skills | `~/.claude/skills/`: reads each `SKILL.md` |
 | Plugin skills | `~/.claude/plugins/`: marketplace plugins enabled in `settings.json` (`enabledPlugins`), plus plugins synced from claude.ai. Ids are `plugin:skill`, the name the Skill tool accepts |
 | MCP servers | `claude_desktop_config.json` / `.claude.json` |
+| claude.ai connectors | `claude mcp list`: connected connectors only (Vercel, Supabase, Context7, …). They are in no local config file. Ids are `mcp_claude_ai_<name>`, and the hint points at `mcp__claude_ai_<Name>__*` tools. Give each one a description in `description_overrides.yaml` |
 
 ### Description Overrides
 
@@ -116,6 +117,19 @@ python bootstrap_agents.py --schedule fri@17:00
 
 Supported schedule expressions: `daily`, `weekly`, `HH:MM`, `DAY@HH:MM`
 For system-level scheduling use cron (macOS/Linux) or Task Scheduler (Windows) to call the script directly — no `schedule` package needed.
+
+On Windows, this registers a daily run that opens no console window and logs to `bootstrap.log`. Missed runs (PC off) run at the next chance:
+
+```powershell
+$repo = "C:\path	o\dytopo-mcp"
+$run  = '-c "import sys,runpy; f=open(''bootstrap.log'',''w'',encoding=''utf-8''); sys.stdout=sys.stderr=f; sys.argv=[''bootstrap_agents.py'']; runpy.run_path(''bootstrap_agents.py'', run_name=''__main__'')"'
+Register-ScheduledTask -TaskName dytopo-bootstrap `
+  -Action (New-ScheduledTaskAction -Execute "C:\path	o\pythonw.exe" -Argument $run -WorkingDirectory $repo) `
+  -Trigger (New-ScheduledTaskTrigger -Daily -At 9:00am) `
+  -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10))
+```
+
+`agents.yaml` is written to a temp file and renamed into place, so the hook never reads a half-written registry during a scheduled run. Check `bootstrap.log` for `No description for …` lines: these are new MCP servers or connectors that need an entry in `description_overrides.yaml`.
 
 ### Semantic Pruner
 
@@ -312,6 +326,8 @@ Example: 10 agents, 3 rounds of communication
 - **Hook hint names tools and skills**, with how to invoke each, instead of a `subagent_type`. The matcher is now `Agent|Task`
 - **Windows Credential Manager for API keys** (`secret_store.py`): env vars first, then `dytopo/NAME`
 - **Plugin skill scanning** (`plugin_scanner.py`) and **description overrides** in bootstrap
+- **claude.ai connector scanning** (`connector_scanner.py`): connected connectors from `claude mcp list` join the registry
+- The PR/GitHub intent rule now points to the official GitHub MCP server (`mcp_github`)
 - **scikit-learn removed**: cosine similarity is computed with numpy
 - **Fix**: the server no longer crashes on startup without `OPENAI_API_KEY`
 - Logging goes to stderr (stdout is the hook's JSON channel and the MCP protocol stream). Core requirements are pinned
