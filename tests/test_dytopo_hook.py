@@ -11,7 +11,7 @@ def scored(*pairs):
 
 SCORES = scored(("python-testing-patterns", 0.50), ("uv-package-manager", 0.36),
                 ("temporal-python-testing", 0.44), ("mcp_muninn", 0.15),
-                ("mcp_mcp_docker", 0.31), ("mcp_github", 0.12), ("mcp_public_browser", 0.23))
+                ("mcp_mcp_docker", 0.31), ("mcp_github", 0.12), ("mcp_public_browser", 0.23), ("mcp_claude_in_chrome", 0.2))
 
 
 def ids(sel):
@@ -34,7 +34,7 @@ def test_open_pr_pins_github_server():
 
 
 def test_form_fill_pins_browser():
-    assert ids(h.select_agents(SCORES, "fill out the signup form on example.com", 3))[0] == "mcp_public_browser"
+    assert ids(h.select_agents(SCORES, "fill out the signup form on example.com", 3))[0] == "mcp_claude_in_chrome"
 
 
 def test_rule_for_unregistered_agent_is_ignored():

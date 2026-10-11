@@ -85,7 +85,8 @@ INTENT_RULES: dict[str, re.Pattern] = {
     "superpowers:brainstorming": re.compile(
         r"\b(brainstorm\w*|ideas? (for|on|about)|come up with ideas|"
         r"design an? (new )?feature)\b", re.I),
-    "mcp_public_browser": re.compile(
+    # Claude in Chrome: your logged-in Chrome, and by far the most-used browser driver.
+    "mcp_claude_in_chrome": re.compile(
         r"\b(fill (out|in)|sign[- ]?up form|log ?in to|in the browser|web ?page|"
         r"navigate to|screenshot of)\b|https?://", re.I),
 }

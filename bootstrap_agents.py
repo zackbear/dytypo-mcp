@@ -77,6 +77,7 @@ def _default_mcp_configs() -> list[Path]:
 DEFAULT_MCP_CONFIGS = _default_mcp_configs()
 DEFAULT_PRUNE_THRESHOLD = float(os.getenv("DYTOPO_PRUNE_THRESHOLD", "0.92"))
 DEFAULT_OVERRIDES = Path(os.getenv("DYTOPO_DESCRIPTION_OVERRIDES", REPO_DIR / "description_overrides.yaml"))
+DEFAULT_EXTRA_AGENTS = Path(os.getenv("DYTOPO_EXTRA_AGENTS", REPO_DIR / "extra_agents.yaml"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -286,6 +287,28 @@ def load_description_overrides(path: Path) -> dict[str, str]:
     return {str(k): str(v).strip() for k, v in data.items() if v}
 
 
+def load_extra_agents(path: Path) -> list[dict]:
+    """Hand-registered agents that no scanner can discover (e.g. Claude in Chrome,
+    which is built into Claude Code rather than configured as an MCP server).
+    Same shape as agents.yaml; invalid entries are skipped with a warning."""
+    if not path.exists():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        print(f"[bootstrap] Could not read {path.name}: {e}", file=sys.stderr)
+        return []
+    agents = []
+    for entry in (data.get("agents") or []) if isinstance(data, dict) else []:
+        if not (isinstance(entry, dict) and entry.get("id") and entry.get("description")):
+            print(f"[bootstrap] Skipping {path.name} entry without id and description: {entry!r}", file=sys.stderr)
+            continue
+        meta = dict(entry.get("metadata") or {}, source="extra_agents")
+        agents.append({"id": str(entry["id"]), "description": str(entry["description"]).strip(), "metadata": meta})
+    print(f"[bootstrap] Extra agents loaded: {len(agents)}", file=sys.stderr)
+    return agents
+
+
 def apply_description_overrides(agents: list[dict], overrides: dict[str, str]) -> list[dict]:
     """Swap in hand-written descriptions by agent id (without editing SKILL.md files).
 
@@ -300,7 +323,8 @@ def apply_description_overrides(agents: list[dict], overrides: dict[str, str]) -
         if a["id"] in overrides:
             a = dict(a, description=overrides[a["id"]],
                      metadata=dict(a.get("metadata") or {}, description_override=True))
-        elif (a.get("metadata") or {}).get("category") == "mcp":
+        elif (a.get("metadata") or {}).get("category") == "mcp" and \
+                (a.get("metadata") or {}).get("source") != "extra_agents":  # those bring their own
             print(f"[bootstrap] No description for '{a['id']}' — add one to {DEFAULT_OVERRIDES.name}", file=sys.stderr)
         out.append(a)
     return out
@@ -546,6 +570,9 @@ def run(
         from connector_scanner import scan_claude_ai_connectors
         all_agents.extend(scan_mcp_servers(mcp_config_paths))
         all_agents.extend(scan_claude_ai_connectors())
+
+    # 4. Hand-registered tools no scanner can find (always included)
+    all_agents.extend(load_extra_agents(DEFAULT_EXTRA_AGENTS))
 
     # Deduplicate by ID (same skill installed in multiple locations)
     before_dedup = len(all_agents)

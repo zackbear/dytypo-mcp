@@ -1,0 +1,17 @@
+# Hand-registered tools that bootstrap_agents.py can't discover on its own.
+# Copy to extra_agents.yaml (gitignored) and edit; bootstrap merges it on every run.
+# Same shape as agents.yaml. For an MCP tool, set metadata.server_name to the
+# middle part of its tool names (mcp__<server_name>__*) so the hint names them.
+
+agents:
+  # Built into Claude Code (Chrome extension), so it's in no MCP config file.
+  - id: mcp_claude_in_chrome
+    description: >-
+      Claude in Chrome: drives your own Chrome browser with your logged-in sessions,
+      cookies, and open tabs. Navigate, read page text and accessibility tree, find
+      elements, click, type, fill forms, take screenshots, record GIFs, read console
+      and network requests, run JavaScript in the page. Best for sites you're signed
+      in to, and for picking the tab that jev-browse then runs on.
+    metadata:
+      category: mcp
+      server_name: claude-in-chrome
