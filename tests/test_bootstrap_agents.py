@@ -77,3 +77,43 @@ def test_write_agents_yaml_round_trips(tmp_path):
     out = tmp_path / "agents.yaml"
     b.write_agents_yaml([{"id": "a", "description": "A"}], out)
     assert yaml.safe_load(out.read_text(encoding="utf-8"))["agents"] == [{"id": "a", "description": "A"}]
+
+
+def test_extra_agents_missing_file_is_empty(tmp_path):
+    assert b.load_extra_agents(tmp_path / "nope.yaml") == []
+
+
+def test_extra_agents_loaded_and_marked(tmp_path):
+    p = tmp_path / "extra_agents.yaml"
+    p.write_text(
+        "agents:\n"
+        "- id: mcp_claude_in_chrome\n"
+        "  description: Drives your Chrome.\n"
+        "  metadata: {category: mcp, server_name: claude-in-chrome}\n",
+        encoding="utf-8")
+    [a] = b.load_extra_agents(p)
+    assert a["id"] == "mcp_claude_in_chrome" and a["description"] == "Drives your Chrome."
+    assert a["metadata"] == {"category": "mcp", "server_name": "claude-in-chrome", "source": "extra_agents"}
+
+
+def test_extra_agents_skips_invalid_entries(tmp_path, capsys):
+    p = tmp_path / "extra_agents.yaml"
+    p.write_text("agents:\n- id: ok\n  description: Fine\n- id: no_desc\n- just a string\n", encoding="utf-8")
+    assert [a["id"] for a in b.load_extra_agents(p)] == ["ok"]
+    assert "no_desc" in capsys.readouterr().err
+
+
+def test_extra_agents_bad_yaml_is_empty(tmp_path, capsys):
+    p = tmp_path / "extra_agents.yaml"
+    p.write_text("agents: [unclosed", encoding="utf-8")
+    assert b.load_extra_agents(p) == []
+    assert "extra_agents.yaml" in capsys.readouterr().err
+
+
+def test_hand_registered_mcp_agent_needs_no_override(capsys):
+    agents = [{"id": "mcp_claude_in_chrome", "description": "Drives Chrome.",
+               "metadata": {"category": "mcp", "source": "extra_agents"}},
+              {"id": "mcp_scanned", "description": "placeholder", "metadata": {"category": "mcp"}}]
+    b.apply_description_overrides(agents, {})
+    err = capsys.readouterr().err
+    assert "mcp_claude_in_chrome" not in err and "mcp_scanned" in err

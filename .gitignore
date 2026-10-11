@@ -52,3 +52,5 @@ agents.yaml.bak*
 description_overrides.yaml
 # Output of the scheduled bootstrap run (Task Scheduler: dytopo-bootstrap)
 bootstrap.log
+# Personal: hand-registered tools on this machine (see extra_agents.example.yaml)
+extra_agents.yaml

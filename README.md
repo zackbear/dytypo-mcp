@@ -102,6 +102,10 @@ mcp_muninn: >-
 
 Re-run `bootstrap_agents.py` after editing. It warns about MCP servers that still have no description, and about overrides for agents that are no longer installed.
 
+### Extra Agents
+
+Some tools can't be discovered by any scanner. Claude in Chrome, for example, is built into Claude Code rather than configured as an MCP server. To register one by hand, copy `extra_agents.example.yaml` to `extra_agents.yaml` (gitignored; override the path with `DYTOPO_EXTRA_AGENTS`) and edit it. The format matches `agents.yaml`, and the example already includes Claude in Chrome. For an MCP tool, set `metadata.server_name` to the middle part of its tool names (`mcp__<server_name>__*`) so the hint names them. Bootstrap adds these entries on every run.
+
 ### Scheduled Execution
 
 ```bash
@@ -328,6 +332,7 @@ Example: 10 agents, 3 rounds of communication
 - **Plugin skill scanning** (`plugin_scanner.py`) and **description overrides** in bootstrap
 - **claude.ai connector scanning** (`connector_scanner.py`): connected connectors from `claude mcp list` join the registry
 - The PR/GitHub intent rule now points to the official GitHub MCP server (`mcp_github`)
+- **Extra agents** (`extra_agents.yaml`) for tools no scanner can find; Claude in Chrome ships in the example. The browser intent rule (forms, logins, screenshots, URLs) now points to Claude in Chrome
 - **scikit-learn removed**: cosine similarity is computed with numpy
 - **Fix**: the server no longer crashes on startup without `OPENAI_API_KEY`
 - Logging goes to stderr (stdout is the hook's JSON channel and the MCP protocol stream). Core requirements are pinned
